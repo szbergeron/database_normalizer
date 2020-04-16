@@ -58,35 +58,45 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
 fn main() {
     let b = Base::new(vec!['a', 'b', 'c', 'd', 'e']);
 
-    /*let mut implications = ImplicationCollection::new(b);
+    let mut implications = ImplicationCollection::new(&b);
 
-    implications.add(b.at(vec!['a']).fdetermines(vec!['b', 'c']));
-    implications.add(b.at(vec!['b']).fdetermines(vec!['d']));
-    implications.add(b.at(vec!['b']).mvdetermines(vec!['c', 'd']));
+    //implications.add(b.at(vec!['a']).fdetermines(vec!['b', 'c']));
+    //implications.add(b.at(vec!['b']).fdetermines(vec!['d']));
+    //implications.add(b.at(vec!['b']).mvdetermines(vec!['c', 'd']));
+    implications.add(b.at(vec!['a']).mvdetermines(vec!['b']));
 
-    implications.close();*/
+    implications.close();
 
-    println!("Permute:");
+    /*println!("Permute:");
     let mut p = BTreeSet::new();
     p.insert('a');
     p.insert('b');
     p.insert('c');
     p.insert('d');
 
-    println!("output: {:?}", permute(&p));
+    println!("output: {:?}", permute(&p));*/
+
+    for d in implications.fds {
+        println!("Fd: {:?}", d);
+    }
+
+    for d in implications.mvds {
+        println!("Mvd: {:?}", d);
+    }
 
     //let mut n = Normalizer::new(implications);
     //let normalizations = n.normalize4();
 }
 
-fn close(m: HashMap<char, Determines>) {
+/*fn close() {
+    let mut 
     let mut unchanged = false;
     let mut det_set: HashSet<HashMap<char, Determines>> = HashSet::new();
     while !unchanged {
         unchanged = true;
-        //
+        for 
     }
-}
+}*/
 
 enum Determines {
     None,
@@ -102,8 +112,26 @@ struct Base {
 }
 
 struct ImplicationBuilder<'a> {
-    attribute: char,
+    attribute: Vec<char>,
     base: &'a Base,
+}
+
+impl<'a> ImplicationBuilder<'a> {
+    pub fn fdetermines(&self, attrs: Vec<char>) -> Implication<'a> {
+        Implication::Functional(FunctionalDependency {
+            base: self.base,
+            from: self.attribute.clone().into_iter().collect(),
+            determines: attrs.into_iter().collect(),
+        })
+    }
+
+    pub fn mvdetermines(&self, attrs: Vec<char>) -> Implication<'a> {
+        Implication::Multivalued(MultivaluedDependency {
+            base: self.base,
+            from: self.attribute.clone().into_iter().collect(),
+            mvdetermines: attrs.into_iter().collect(),
+        })
+    }
 }
 
 impl Base {
@@ -111,7 +139,7 @@ impl Base {
         Base { attributes: attrs }
     }
 
-    pub fn at(&self, attr: char) -> ImplicationBuilder {
+    pub fn at(&self, attr: Vec<char>) -> ImplicationBuilder {
         ImplicationBuilder {
             attribute: attr,
             base: self
@@ -119,14 +147,14 @@ impl Base {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 struct FunctionalDependency<'a> {
     base: &'a Base,
     from: BTreeSet<char>,
     determines: BTreeSet<char>,
 }
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 struct MultivaluedDependency<'a> {
     base: &'a Base,
     from: BTreeSet<char>,
@@ -168,6 +196,35 @@ impl<'a> MultivaluedDependency<'a> {
                     base: self.base.clone(),
                 };
                 r.insert(mvd);
+            }
+        }
+
+        r
+    }
+
+    pub fn coalescence_closure(&self, other: &FunctionalDependency<'a>) -> HashSet<FunctionalDependency<'a>> {
+        let mut r = HashSet::new();
+        
+        // if alpha ->> beta
+        // gamma subset beta
+        // delta within R
+        // delta disjoint beta
+        // delta -> gamma
+        //
+        // then
+        // alpha -> gamma
+        let alpha = &self.from;
+        let beta = &self.mvdetermines;
+        let delta = &other.from;
+        let gamma = &other.determines;
+        if gamma.is_subset(beta) {
+            if delta.is_disjoint(beta) {
+                let fd = FunctionalDependency {
+                    from: alpha.clone(),
+                    determines: gamma.clone(),
+                    base: self.base.clone(),
+                };
+                r.insert(fd);
             }
         }
 
@@ -236,7 +293,7 @@ impl<'a> FunctionalDependency<'a> {
         r
     }
 
-    pub fn autmentation_closure(&self) -> HashSet<FunctionalDependency<'a>> {
+    pub fn augmentation_closure(&self) -> HashSet<FunctionalDependency<'a>> {
         let mut r = HashSet::new();
         for s in permute(&self.base.attributes.clone().into_iter().collect()) {
             let fd = FunctionalDependency {
@@ -266,6 +323,14 @@ impl<'a> FunctionalDependency<'a> {
 
     pub fn replication_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
         let mut r = HashSet::new();
+        let mvd = MultivaluedDependency {
+            from: self.from.clone(),
+            mvdetermines: self.determines.clone(),
+            base: self.base.clone(),
+        };
+        r.insert(mvd);
+
+        r
     }
 }
 
@@ -294,7 +359,74 @@ enum Implication<'a> {
 
 
 struct ImplicationCollection<'a> {
-    implications: HashSet<Implication<'a>>,
+    fds: HashSet<FunctionalDependency<'a>>,
+    mvds: HashSet<MultivaluedDependency<'a>>,
+    base: &'a Base,
+}
+
+impl<'a> ImplicationCollection<'a> {
+    pub fn new(base: &'a Base) -> ImplicationCollection<'a> {
+        ImplicationCollection {
+            base,
+            fds: HashSet::new(),
+            mvds: HashSet::new(),
+        }
+    }
+
+    pub fn add(&mut self, implication: Implication<'a>) {
+        match implication {
+            Implication::Multivalued(mvd) => {
+                println!("Given {:?} -> {:?}", mvd.from, mvd.mvdetermines);
+                self.mvds.insert(mvd);
+            },
+            Implication::Functional(fd) => {
+                println!("Given {:?} ->> {:?}", fd.from, fd.determines);
+                self.fds.insert(fd);
+            },
+        }
+    }
+
+    pub fn close(&mut self) {
+        //let mut unchanged = false;
+        //let mut det_set: HashSet<HashMap<char, Determines>> = HashSet::new();
+        let mut last_size = 0;
+        while last_size < (self.mvds.len() + self.fds.len()) {
+            last_size = self.mvds.len() + self.fds.len();
+            println!("Inside loop, current size is {}", last_size);
+            //unchanged = true;
+            for self_mvd in self.mvds.clone() {
+                for mvd in self_mvd.complementation_closure() {
+                    self.mvds.insert(mvd);
+                }
+                for mvd in self_mvd.multivalued_augmentation_closure() {
+                    self.mvds.insert(mvd);
+                }
+
+                for other_fd in self.fds.clone() {
+                    for fd in self_mvd.coalescence_closure(&other_fd) {
+                        self.fds.insert(fd);
+                    }
+                }
+            }
+
+            for self_fd in self.fds.clone() {
+                for fd in self_fd.reflexive_closure() {
+                    self.fds.insert(fd);
+                }
+                for fd in self_fd.augmentation_closure() {
+                    self.fds.insert(fd);
+                }
+                for mvd in self_fd.replication_closure() {
+                    self.mvds.insert(mvd);
+                }
+                for other_fd in self.fds.clone() {
+                    for fd in self_fd.transitive_closure(&other_fd) {
+                        self.fds.insert(fd);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'a> ImplicationBuilder<'a> {
