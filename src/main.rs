@@ -1,6 +1,6 @@
 #![feature(map_first_last)]
 
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::BTreeSet;
 //use std::collections::
@@ -20,7 +20,7 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
 
     //println!("Explore: {:?}", letter);
 
-    let mut sets: HashSet<BTreeSet<T>> = permute(&passed);
+    let sets: HashSet<BTreeSet<T>> = permute(&passed);
     //println!("Sets: {:?}", sets);
 
     //let sum = BTreeSet::new();
@@ -28,7 +28,7 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
     prefix.insert(letter);
     //println!("Prefix: {:?}", prefix);
     //let prefixed = sets.clone().iter().map(|set| { set.union(&prefix) });
-    let mut prefixed = sets.clone().iter().map(|set| {
+    let prefixed = sets.clone().iter().map(|set| {
         //println!("Set cur: {:?}", set);
         set.union(&prefix).cloned().collect()
     }).collect();
@@ -57,13 +57,14 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
 
 fn main() {
     let b = Base::new(vec!['a', 'b', 'c', 'd', 'e']);
+    //let b = Base::new(vec!['a', 'b']);
 
     let mut implications = ImplicationCollection::new(&b);
 
-    //implications.add(b.at(vec!['a']).fdetermines(vec!['b', 'c']));
-    //implications.add(b.at(vec!['b']).fdetermines(vec!['d']));
-    //implications.add(b.at(vec!['b']).mvdetermines(vec!['c', 'd']));
-    implications.add(b.at(vec!['a']).mvdetermines(vec!['b']));
+    implications.add(b.at(vec!['a']).fdetermines(vec!['b', 'c']));
+    implications.add(b.at(vec!['b']).fdetermines(vec!['d']));
+    implications.add(b.at(vec!['b']).mvdetermines(vec!['c', 'd']));
+    //implications.add(b.at(vec!['a']).mvdetermines(vec!['b']));
 
     implications.close();
 
@@ -77,33 +78,21 @@ fn main() {
     println!("output: {:?}", permute(&p));*/
 
     for d in implications.fds {
-        println!("Fd: {:?}", d);
+        if !d.uninteresting() {
+            //println!("Fd: {:?}", d);
+            println!("Finds {:?} -> {:?}", d.from, d.determines);
+        }
     }
 
     for d in implications.mvds {
-        println!("Mvd: {:?}", d);
+        if !d.uninteresting() {
+            //println!("Mvd: {:?}", d);
+            println!("Finds {:?} ->> {:?}", d.from, d.mvdetermines);
+        }
     }
 
     //let mut n = Normalizer::new(implications);
     //let normalizations = n.normalize4();
-}
-
-/*fn close() {
-    let mut 
-    let mut unchanged = false;
-    let mut det_set: HashSet<HashMap<char, Determines>> = HashSet::new();
-    while !unchanged {
-        unchanged = true;
-        for 
-    }
-}*/
-
-enum Determines {
-    None,
-    MVDSource,
-    FDSource,
-    MVDDeterminant,
-    FDDeterminant,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug)]
@@ -162,6 +151,9 @@ struct MultivaluedDependency<'a> {
 }
 
 impl<'a> MultivaluedDependency<'a> {
+    pub fn uninteresting(&self) -> bool {
+        self.trivial() || self.mvdetermines.len() == 0
+    }
     pub fn trivial(&self) -> bool {
         self.mvdetermines.is_subset(&self.from) || self.from.union(&self.mvdetermines).count() == self.base.attributes.len()
     }
@@ -275,6 +267,10 @@ impl<'a> MultivaluedDependency<'a> {
 }
 
 impl<'a> FunctionalDependency<'a> {
+    pub fn uninteresting(&self) -> bool {
+        self.trivial() || self.determines.len() == 0
+    }
+
     pub fn trivial(&self) -> bool {
         self.determines.is_subset(&self.from)
     }
@@ -339,24 +335,6 @@ enum Implication<'a> {
     Multivalued(MultivaluedDependency<'a>),
 }
 
-/*struct Implication<'a> {
-    pub m: HashMap<char, Determines>,
-}*/
-
-/*impl<'a> Implication<'a> {
-    pub fn new() -> Implication<'a> {
-        Implication {
-            m: HashMap::new()
-        }
-    }
-
-    pub fn newFromMap(m: HashMap<char, Determines>) -> Implication {
-        Implication {
-            m
-        }
-    }
-}*/
-
 
 struct ImplicationCollection<'a> {
     fds: HashSet<FunctionalDependency<'a>>,
@@ -373,14 +351,18 @@ impl<'a> ImplicationCollection<'a> {
         }
     }
 
+    pub fn within(&self) -> &'a Base {
+        self.base
+    }
+
     pub fn add(&mut self, implication: Implication<'a>) {
         match implication {
             Implication::Multivalued(mvd) => {
-                println!("Given {:?} -> {:?}", mvd.from, mvd.mvdetermines);
+                println!("Given {:?} ->> {:?}", mvd.from, mvd.mvdetermines);
                 self.mvds.insert(mvd);
             },
             Implication::Functional(fd) => {
-                println!("Given {:?} ->> {:?}", fd.from, fd.determines);
+                println!("Given {:?} -> {:?}", fd.from, fd.determines);
                 self.fds.insert(fd);
             },
         }
@@ -392,7 +374,7 @@ impl<'a> ImplicationCollection<'a> {
         let mut last_size = 0;
         while last_size < (self.mvds.len() + self.fds.len()) {
             last_size = self.mvds.len() + self.fds.len();
-            println!("Inside loop, current size is {}", last_size);
+            //println!("Inside loop, current size is {}", last_size);
             //unchanged = true;
             for self_mvd in self.mvds.clone() {
                 for mvd in self_mvd.complementation_closure() {
@@ -429,5 +411,14 @@ impl<'a> ImplicationCollection<'a> {
     }
 }
 
-impl<'a> ImplicationBuilder<'a> {
+struct Normalizer<'a> {
+    ic: ImplicationCollection<'a>,
+}
+
+impl<'a> Normalizer<'a> {
+    pub fn new(ic: ImplicationCollection<'a>) -> Normalizer<'a> {
+        Normalizer {
+            ic,
+        }
+    }
 }
