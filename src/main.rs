@@ -152,7 +152,7 @@ struct MultivaluedDependency<'a> {
 
 impl<'a> MultivaluedDependency<'a> {
     pub fn uninteresting(&self) -> bool {
-        self.trivial() || self.mvdetermines.len() == 0
+        self.trivial() || self.mvdetermines.len() == 0 || !self.from.is_disjoint(&self.mvdetermines)
     }
     pub fn trivial(&self) -> bool {
         self.mvdetermines.is_subset(&self.from) || self.from.union(&self.mvdetermines).count() == self.base.attributes.len()
@@ -268,7 +268,7 @@ impl<'a> MultivaluedDependency<'a> {
 
 impl<'a> FunctionalDependency<'a> {
     pub fn uninteresting(&self) -> bool {
-        self.trivial() || self.determines.len() == 0
+        self.trivial() || self.determines.len() == 0 || !self.from.is_disjoint(&self.determines)
     }
 
     pub fn trivial(&self) -> bool {
@@ -420,5 +420,9 @@ impl<'a> Normalizer<'a> {
         Normalizer {
             ic,
         }
+    }
+
+    pub fn normalize4(&mut self, key: Vec<char>) {
+        let mut decompositions: HashSet<HashSet<Vec<char>>> = HashSet::new();
     }
 }
