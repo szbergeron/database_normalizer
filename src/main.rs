@@ -3,6 +3,8 @@
 use std::io;
 use std::io::prelude::*;
 use std::collections::HashSet;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::collections::BTreeSet;
 //use crate::ImplicationCollection;
 use rust_closure_generator::*;
@@ -90,9 +92,16 @@ fn main() {
 
     let n = Normalizer::new(&implications);
     let normalizations = n.normalize4NF(vec!["a", "e"]);
+    println!("Finished normalizing, culling uninteresting normalizations...");
 
-    for normalization in normalizations {
-        println!("N: {:?}", normalization);
+    //let mut filtered: HashMap<BTreeSet<Rc<AttrCollection>>, Decomposition> = HashMap::new();
+    /*for (_, normalization in normalizations {
+        filtered.insert(normalization.flatten(), normalization);
+        //println!("N: {}", normalization);
+    }*/
+
+    for (flat, normalization) in normalizations {
+        println!("N: {:?} ||| {}", flat, normalization);
     }
         //println!("Normalizes: 
 
@@ -104,14 +113,14 @@ fn main() {
 
         //let imp = implications.clone();
 
-        for d in implications.clone().fds.clone().iter().filter(|fd| fd.from == toks) {
+        for d in implications.clone().fds.clone().iter().filter(|fd| *fd.from == toks) {
             if !d.uninteresting() {
                 //println!("Fd: {:?}", d);
                 println!("{:?} -> {:?}", d.from, d.determines);
             }
         }
 
-        for d in implications.clone().mvds.clone().iter().filter(|fd| fd.from == toks) {
+        for d in implications.clone().mvds.clone().iter().filter(|fd| *fd.from == toks) {
             if !d.uninteresting() {
                 //println!("Mvd: {:?}", d);
                 println!("{:?} ->> {:?}", d.from, d.mvdetermines);

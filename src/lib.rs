@@ -3,7 +3,9 @@
 use std::io;
 use std::io::prelude::*;
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::collections::BTreeSet;
+use std::rc::Rc;
 //use std::collections::
 
 fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
@@ -56,36 +58,45 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
     }*/
 }
 
-type AttrCollection = BTreeSet<String>;
+pub type AttrCollection = BTreeSet<String>;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct Base {
-    pub attributes: AttrCollection,
+    pub attributes: Rc<AttrCollection>,
 }
 
 pub struct ImplicationBuilder {
     attribute: Vec<String>,
-    base: Base,
+    base: Rc<Base>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct FunctionalDependency {
-    base: Base,
-    pub from: AttrCollection,
-    pub determines: AttrCollection,
+    base: Rc<Base>,
+    pub from: Rc<AttrCollection>,
+    pub determines: Rc<AttrCollection>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct MultivaluedDependency {
-    base: Base,
-    pub from: AttrCollection,
-    pub mvdetermines: AttrCollection,
+    base: Rc<Base>,
+    pub from: Rc<AttrCollection>,
+    pub mvdetermines: Rc<AttrCollection>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub enum Implication {
     Functional(FunctionalDependency),
     Multivalued(MultivaluedDependency),
+}
+
+impl Implication {
+    pub fn base(&self) -> Rc<Base> {
+        match self {
+            Implication::Functional(fd) => fd.base.clone(),
+            Implication::Multivalued(mvd) => mvd.base.clone(),
+        }
+    }
 }
 
 impl<'a> fmt::Display for Implication {
@@ -105,7 +116,7 @@ fn join_attr_list(attribute_list: &AttrCollection) -> String {
 
 impl<'a> fmt::Display for MultivaluedDependency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ->> {}", join_attr_list(&self.from), join_attr_list(&self.mvdetermines))
+        write!(f, "{} ->> {} within {}", join_attr_list(&self.from), join_attr_list(&self.mvdetermines), self.base)
     }
 }
 
@@ -115,7 +126,13 @@ impl<'a> fmt::Display for FunctionalDependency {
         //let join = |attribute_list: AttrCollection| -> String { attribute_list.iter().fold(String::new(), |push, token| push + token) };
         //let first = self.from.iter().fold(String::new(), |push, token| push + token);
         //let second = self.determines.iter().fold(String::new(), |push, token| 
-        write!(f, "{} -> {}", join_attr_list(&self.from), join_attr_list(&self.determines))
+        write!(f, "{} -> {} within {}", join_attr_list(&self.from), join_attr_list(&self.determines), self.base)
+    }
+}
+
+impl fmt::Display for Base {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", join_attr_list(&self.attributes))
     }
 }
 
@@ -134,24 +151,24 @@ impl<'a> ImplicationBuilder {
     }
 
     pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Implication {
-        let attrs = attrs.into_iter().collect();
+        let attrs = Rc::new(attrs.into_iter().collect());
         Implication::Functional(FunctionalDependency {
-            base: self.base,
-            from: self.attribute.clone().into_iter().collect(),
+            base: self.base.clone(),
+            from: Rc::new(self.attribute.clone().into_iter().collect()),
             determines: attrs,
         })
     }
 
-    pub fn mvdetermines(&self, attrs: Vec<&str>) -> Implication<'a> {
+    pub fn mvdetermines(&self, attrs: Vec<&str>) -> Implication {
         let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
         self.owned_mvdetermines(attrs)
     }
 
-    pub fn owned_mvdetermines(&self, attrs: Vec<String>) -> Implication<'a> {
-        let attrs = attrs.into_iter().collect();
+    pub fn owned_mvdetermines(&self, attrs: Vec<String>) -> Implication {
+        let attrs = Rc::new(attrs.into_iter().collect());
         Implication::Multivalued(MultivaluedDependency {
-            base: self.base,
-            from: self.attribute.clone().into_iter().collect(),
+            base: self.base.clone(),
+            from: Rc::new(self.attribute.clone().into_iter().collect()),
             mvdetermines: attrs,
         })
     }
@@ -159,14 +176,14 @@ impl<'a> ImplicationBuilder {
 
 impl Base {
     pub fn new(attrs: Vec<&str>) -> Base {
-        Base { attributes: attrs.into_iter().map(|s: &str| s.to_owned()).collect() }
+        Base { attributes: Rc::new(attrs.into_iter().map(|s: &str| s.to_owned()).collect()) }
     }
 
     pub fn at(&self, attr: Vec<&str>) -> ImplicationBuilder {
         let attr = attr.into_iter().map(|s: &str| s.to_owned()).collect();
         ImplicationBuilder {
             attribute: attr,
-            base: self
+            base: Rc::new(self.clone())
         }
     }
 
@@ -174,12 +191,12 @@ impl Base {
     pub fn owned_at(&self, attr: Vec<String>) -> ImplicationBuilder {
         ImplicationBuilder {
             attribute: attr,
-            base: self 
+            base: Rc::new(self.clone())
         }
     }
 }
 
-impl<'a> MultivaluedDependency<'a> {
+impl<'a> MultivaluedDependency {
     pub fn decompositionally_useful(&self) -> bool {
         self.base.attributes.len() > self.attr_count()
     }
@@ -195,34 +212,45 @@ impl<'a> MultivaluedDependency<'a> {
         self.mvdetermines.is_subset(&self.from) || self.from.union(&self.mvdetermines).count() == self.base.attributes.len()
     }
 
-    pub fn complementation_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
-        let all_elems: HashSet<String> = self.base.attributes.clone().into_iter().collect();
-        let complement = all_elems
+    pub fn complementation_closure(&self) -> HashSet<MultivaluedDependency> {
+        //let all_elems: BTreeSet<String> = self.base.attributes.clone().into_iter().collect();
+        let all_elems = self.base.attributes.clone();
+        /*let complement = all_elems
             .difference( &self.mvdetermines.clone().into_iter().collect() )
+            //.difference( self.mvdetermines.iter()
             .cloned()
             .collect::<HashSet<String>>()
             .difference( &self.from.clone().into_iter().collect() )
             .cloned()
-            .collect::<HashSet<String>>();
+            .collect::<HashSet<String>>();*/
+        let complement = all_elems
+            .difference( &self.mvdetermines )
+            .cloned()
+            .collect::<AttrCollection>()
+            .difference( &self.from )
+            .cloned()
+            .collect();
 
         let mut h = HashSet::new();
         h.insert(MultivaluedDependency {
-            base: self.base,
+            base: self.base.clone(),
             from: self.from.clone(),
-            mvdetermines: complement.into_iter().collect(),
+            //mvdetermines: Rc::new(complement.into_iter().collect()),
+            mvdetermines: Rc::new(complement),
         });
 
         h
     }
 
-    pub fn multivalued_augmentation_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
+    pub fn multivalued_augmentation_closure(&self) -> HashSet<MultivaluedDependency> {
         let mut r = HashSet::new();
-        for gamma in permute(&self.base.attributes.clone().into_iter().collect()) {
+        //for gamma in permute(&self.base.attributes.clone().into_iter().collect()) {
+        for gamma in permute(&self.base.attributes) {
             for delta in permute(&gamma) {
                 let mvd = MultivaluedDependency {
-                    from: self.from.union(&gamma).cloned().collect(),
-                    mvdetermines: self.mvdetermines.union(&delta).cloned().collect(),
-                    base: self.base,
+                    from: Rc::new(self.from.union(&gamma).cloned().collect()),
+                    mvdetermines: Rc::new(self.mvdetermines.union(&delta).cloned().collect()),
+                    base: self.base.clone(),
                 };
                 r.insert(mvd);
             }
@@ -231,7 +259,7 @@ impl<'a> MultivaluedDependency<'a> {
         r
     }
 
-    pub fn coalescence_closure(&self, other: &FunctionalDependency<'a>) -> HashSet<FunctionalDependency<'a>> {
+    pub fn coalescence_closure(&self, other: &FunctionalDependency) -> HashSet<FunctionalDependency> {
         let mut r = HashSet::new();
         
         // if alpha ->> beta
@@ -251,7 +279,7 @@ impl<'a> MultivaluedDependency<'a> {
                 let fd = FunctionalDependency {
                     from: alpha.clone(),
                     determines: gamma.clone(),
-                    base: self.base,
+                    base: self.base.clone(),
                 };
                 r.insert(fd);
             }
@@ -267,7 +295,7 @@ trait Dependency {
     fn uninteresting(&self) -> bool;
 }
 
-impl<'a> FunctionalDependency<'a> {
+impl<'a> FunctionalDependency {
     pub fn attr_count(&self) -> usize {
         self.from.len() + self.determines.len()
     }
@@ -284,13 +312,13 @@ impl<'a> FunctionalDependency<'a> {
         self.determines.is_subset(&self.from)
     }
 
-    pub fn reflexive_closure(&self) -> HashSet<FunctionalDependency<'a>> {
+    pub fn reflexive_closure(&self) -> HashSet<FunctionalDependency> {
         let mut r = HashSet::new();
         for s in permute(&self.from).into_iter() {
             let fd = FunctionalDependency {
                 from: self.from.clone(),
-                determines: s,
-                base: self.base,
+                determines: Rc::new(s),
+                base: self.base.clone(),
             };
             r.insert(fd);
         }
@@ -298,13 +326,13 @@ impl<'a> FunctionalDependency<'a> {
         r
     }
 
-    pub fn augmentation_closure(&self) -> HashSet<FunctionalDependency<'a>> {
+    pub fn augmentation_closure(&self) -> HashSet<FunctionalDependency> {
         let mut r = HashSet::new();
-        for s in permute(&self.base.attributes.clone().into_iter().collect()) {
+        for s in permute(&(*self.base.attributes).clone().into_iter().collect()) {
             let fd = FunctionalDependency {
-                from: self.from.union(&s).cloned().collect(),
-                determines: self.determines.union(&s).cloned().collect(),
-                base: self.base,
+                from: Rc::new(self.from.union(&s).cloned().collect()),
+                determines: Rc::new(self.determines.union(&s).cloned().collect()),
+                base: self.base.clone(),
             };
             r.insert(fd);
         }
@@ -312,13 +340,13 @@ impl<'a> FunctionalDependency<'a> {
         r
     }
 
-    pub fn transitive_closure(&self, other: &FunctionalDependency<'a>) -> HashSet<FunctionalDependency<'a>> {
+    pub fn transitive_closure(&self, other: &FunctionalDependency) -> HashSet<FunctionalDependency> {
         let mut r = HashSet::new();
         if self.determines == other.from {
             let fd = FunctionalDependency {
                 from: self.from.clone(),
                 determines: other.determines.clone(),
-                base: self.base,
+                base: self.base.clone(),
             };
             r.insert(fd);
         }
@@ -326,12 +354,12 @@ impl<'a> FunctionalDependency<'a> {
         r
     }
 
-    pub fn replication_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
+    pub fn replication_closure(&self) -> HashSet<MultivaluedDependency> {
         let mut r = HashSet::new();
         let mvd = MultivaluedDependency {
             from: self.from.clone(),
             mvdetermines: self.determines.clone(),
-            base: self.base,
+            base: self.base.clone(),
         };
         r.insert(mvd);
 
@@ -359,7 +387,7 @@ impl<'a> ImplicationCollection<'a> {
         panic!("not implemented");
     }
 
-    pub fn add(&mut self, implication: Implication<'a>) {
+    pub fn add(&mut self, implication: Implication) {
         match implication {
             Implication::Multivalued(mvd) => {
                 println!("Given {:?} ->> {:?}", mvd.from, mvd.mvdetermines);
@@ -421,30 +449,46 @@ pub struct Normalizer<'a> {
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
-pub enum Decomposition<'a> {
-    Split(Split<'a>),
-    Leaf(AttrCollection),
+pub enum Decomposition {
+    Split(Split),
+    Leaf(Rc<AttrCollection>),
+}
+
+impl Decomposition {
+    pub fn flatten(&self) -> BTreeSet<Rc<AttrCollection>> {
+        match self {
+            Decomposition::Leaf(collection) => {
+                let mut s = BTreeSet::new();
+                s.insert(collection.clone());
+                s
+            },
+            Decomposition::Split(split) => {
+                split.left.flatten().union(&split.right.flatten()).cloned().collect()
+            }
+        }
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
-pub struct Split<'a> {
-    pub left: Box<Decomposition<'a>>,
-    pub right: Box<Decomposition<'a>>,
-    by: Implication<'a>,
+pub struct Split {
+    pub left: Rc<Decomposition>,
+    pub right: Rc<Decomposition>,
+    by: Implication,
 }
 
 use std::fmt;
-impl<'a, 'b> std::fmt::Display for Decomposition<'a> {
+impl<'a, 'b> std::fmt::Display for Decomposition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Decomposition::Split(split) => {
-                write!(f, "split {}, {} by applying {}", split.left, split.right, split.by);
+                write!(f, "split ({}), ({}) by applying ({})", split.left, split.right, split.by)
             },
             Decomposition::Leaf(attributes) => {
+                write!(f, "{}", join_attr_list(attributes))
             },
         }
 
-        Ok(())
+        //Ok(())
     }
 }
 
@@ -457,7 +501,7 @@ impl<'a> Normalizer<'a> {
     }
 
     #[allow(dead_code, unused_variables, unused_mut)]
-    pub fn normalize4NF(&self, key: Vec<&str>) -> BTreeSet<Decomposition> {
+    pub fn normalize4NF(&self, key: Vec<&str>) -> HashMap<BTreeSet<Rc<AttrCollection>>, Decomposition> {
         let key: AttrCollection = key.into_iter().map(|s| s.to_owned()).collect();
 
         let mut decompositions: HashSet<HashSet<Vec<char>>> = HashSet::new();
@@ -467,7 +511,7 @@ impl<'a> Normalizer<'a> {
         //self.ic.fds
         //self.ic.fds
         let ic: &ImplicationCollection<'a> = &self.ic;
-        let dependencies: Vec<Implication<'a>> = ic
+        let dependencies: Vec<Implication> = ic
                 .fds
                 .iter()
                 .filter(|fd| {
@@ -497,15 +541,16 @@ impl<'a> Normalizer<'a> {
                 .map(|mvd| {
                     Implication::Multivalued(mvd.clone())
                 }))
-            .collect::<Vec<Implication<'a>>>();
+            .collect::<Vec<Implication>>();
 
 
-        let mut r = BTreeSet::new();
+        let mut r = HashMap::new();
         if dependencies.len() == 0 {
             //r.insert(from_param_vec(self.ic.base.attributes));
             //let mut r_inner = BTreeSet::new();
             //r_inner.insert(self.ic.base.attributes.clone());
-            r.insert(Decomposition::Leaf(self.ic.base.attributes.clone()));
+            let decomp = Decomposition::Leaf(self.ic.base.attributes.clone());
+            r.insert(decomp.flatten(), decomp);
             //r.insert(r_inner);
         }
 
@@ -513,36 +558,41 @@ impl<'a> Normalizer<'a> {
             //println!("Decomp tries dependency {:?}", dependency);
             //all the different ways we can split up the table
             let (from, to, base, key_a) = match dependency {
-                Implication::Functional(fd) => (fd.from.clone(), fd.determines.clone(), fd.base, fd.from.clone()),
+                Implication::Functional(fd) => (fd.from.clone(), fd.determines.clone(), fd.base.clone(), fd.from.clone()),
                 Implication::Multivalued(mvd) => (
                     mvd.from.clone(),
                     mvd.mvdetermines.clone(),
-                    mvd.base,
-                    mvd.from.union(&(mvd.mvdetermines)).cloned().collect()),
+                    mvd.base.clone(),
+                    Rc::new(mvd.from.union(&(mvd.mvdetermines)).cloned().collect())),
             };
 
 
-            let set_a: AttrCollection = from.union(&to).cloned().collect();
-            let base_a = Base { attributes: set_a.clone() };
+            let set_a: Rc<AttrCollection> = Rc::new(from.union(&to).cloned().collect());
+            let base_a = Rc::new(Base { attributes: set_a.clone() });
             //let dependencies_a = dependencies.iter().filter(|dep|
-            let set_b: AttrCollection = base.attributes.difference(&to).cloned().collect();
-            let base_b = Base { attributes: set_b.clone() };
+            let set_b: Rc<AttrCollection> = Rc::new(base.attributes.difference(&to).cloned().collect());
+            let base_b = Rc::new(Base { attributes: set_b.clone() });
 
-            let fds: Vec<HashSet<FunctionalDependency>> = vec![&set_a, &set_b].iter().map(|attrs| {
+            //let fds: Vec<HashSet<FunctionalDependency>> = vec![&set_a, &set_b].iter().map(|attrs| {
+            let fds: Vec<HashSet<FunctionalDependency>> = vec![(&set_a, base_a.clone()), (&set_b, base_b.clone())].iter().map(|(set, base)| {
                 ic.fds.clone().into_iter().filter(|fd| {
-                    fd.from.is_subset(attrs) && fd.determines.is_subset(&set_a)
+                    fd.from.is_subset(&set) && fd.determines.is_subset(&set)
                 }).map(|fd| {
-                    FunctionalDependency { base: &base_a, from: fd.from, determines: fd.determines }
+                    FunctionalDependency { base: base.clone(), from: fd.from, determines: fd.determines }
                 }).collect::<HashSet<FunctionalDependency>>()
             }).collect();
 
-            let mvds: Vec<HashSet<MultivaluedDependency>> = vec![&set_a, &set_b].iter().map(|attrs| {
+            let mvds: Vec<HashSet<MultivaluedDependency>> = vec![(&set_a, base_a.clone()), (&set_b, base_b.clone())].iter().map(|(set, base)| {
                 ic.mvds.clone().into_iter().filter(|mvd| {
-                    mvd.from.is_subset(attrs) && mvd.mvdetermines.is_subset(&set_a)
+                    mvd.from.is_subset(&set) && mvd.mvdetermines.is_subset(&set)
                 }).map(|mvd| {
-                    MultivaluedDependency { base: &base_a, from: mvd.from, mvdetermines: mvd.mvdetermines }
+                    MultivaluedDependency { base: base.clone(), from: mvd.from, mvdetermines: mvd.mvdetermines }
                 }).collect::<HashSet<MultivaluedDependency>>()
             }).collect();
+
+            /*if base_a.attributes.union(&base_b.attributes).count() < dependency.base().attributes.len() {
+                panic!("Decomposition lost some attrs");
+            }*/
 
             let relation_a = ImplicationCollection {
                 fds: fds[0].clone(),
@@ -553,8 +603,8 @@ impl<'a> Normalizer<'a> {
             let normalized_a = Normalizer::new(&relation_a);
 
             let relation_b = ImplicationCollection {
-                fds: fds[0].clone(),
-                mvds: mvds[0].clone(),
+                fds: fds[1].clone(),
+                mvds: mvds[1].clone(),
                 base: &base_b,
             };
 
@@ -575,14 +625,46 @@ impl<'a> Normalizer<'a> {
             }*/
 
             //let mut r_inner = BTreeSet::new();
-            for decomp_a in decomps_a.iter() {
-                for decomp_b in decomps_b.iter() {
+            for (flat_a, decomp_a) in decomps_a.iter() {
+                for (flat_b, decomp_b) in decomps_b.iter() {
+                    let mut maybe_all = AttrCollection::new();
+                    for set in vec![flat_a, flat_b].iter() {
+                        for attrset in set.iter() {
+                            //maybe_all.append(*attrset);
+                            for attr in attrset.iter() {
+                                maybe_all.insert(attr.clone());
+                            }
+                            //maybe_all.extend(attrset.iter().map(|item: String| item)); 
+                        }
+                    }
+
+                    //if maybe_all.len() != dependency.base().attributes.len() {
+                    if maybe_all != *dependency.base().attributes {
+                        println!("Got differently lengthd current base and relation bases.");
+                        println!("Current base is {}", dependency.base());
+                        println!("Base a is {}", base_a);
+                        println!("Base b is {}", base_b);
+                        println!("Relation a decomps to {}", decomp_a);
+                        println!("Relation b decomps to {}", decomp_b);
+                        println!("Dependency was {}", dependency);
+                        println!("set_a was {:?}", set_a);
+                        println!("set_b was {:?}", set_b);
+                        panic!();
+                    }
+                    /*assert!(maybe_all.len() == dependency.base().attributes.len(),
+                        " maybe_all was {:?} while dep was {}", maybe_all, dependency);*/
                     //let mut pairings = BTreeSet
-                    r.insert(Decomposition::Split(
+                    let decomp = Decomposition::Split(
+                        Split{
+                            left: Rc::new(decomp_a.clone()),
+                            right: Rc::new(decomp_b.clone()),
+                            by: dependency.clone()});
+                    r.insert(decomp.flatten(), decomp);
+                    /*r.insert(Decomposition::Split(
                             Split{
-                                left: Box::new(decomp_a.clone()),
-                                right: Box::new(decomp_b.clone()),
-                                by: dependency.clone()}));
+                                left: Rc::new(decomp_a.clone()),
+                                right: Rc::new(decomp_b.clone()),
+                                by: dependency.clone()}));*/
                     /*let mut pairings: BTreeSet<AttrCollection> = BTreeSet::new();
                     for relation_a in decomp_a.clone() {
                         pairings.insert(relation_a);
