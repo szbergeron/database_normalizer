@@ -1,61 +1,11 @@
 #![feature(map_first_last)]
 
-//use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 use std::collections::HashSet;
 use std::collections::BTreeSet;
-//use std::collections::
-
-fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
-    where T: Clone + Ord + std::hash::Hash + std::fmt::Debug
-{
-
-    if set.is_empty() {
-        let mut h = HashSet::new();
-        h.insert(BTreeSet::new());
-        return h;
-    }
-
-    let mut passed = set.clone();
-    let letter = passed.pop_first().unwrap();
-
-    //println!("Explore: {:?}", letter);
-
-    let sets: HashSet<BTreeSet<T>> = permute(&passed);
-    //println!("Sets: {:?}", sets);
-
-    //let sum = BTreeSet::new();
-    let mut prefix = BTreeSet::new();
-    prefix.insert(letter);
-    //println!("Prefix: {:?}", prefix);
-    //let prefixed = sets.clone().iter().map(|set| { set.union(&prefix) });
-    let prefixed = sets.clone().iter().map(|set| {
-        //println!("Set cur: {:?}", set);
-        set.union(&prefix).cloned().collect()
-    }).collect();
-    //println!("Prefixed: {:?}", prefixed);
-    //let mut prefixed = prefixed.collect();
-    let normal = sets.clone();
-
-    normal.union(&prefixed).cloned().collect()
-    /*for prefix in vec![true, false].iter() {
-        let s = match prefix {
-            false => sets.clone(),
-            true => {
-                let mut s = sets.clone();
-                //
-                s
-            },
-        };
-    }*/
-
-    //let mut working: BTreeSet<T> = BTreeSet::new();
-    /*let with = {
-        let mut working: BTreeSet<T> = set.clone();
-        let attr = working.pop_first();
-    }*/
-}
+//use crate::ImplicationCollection;
+use rust_closure_generator::*;
 
 fn main() {
     let b = Base::new(vec!["a", "b", "c", "d", "e"]);
@@ -66,18 +16,16 @@ fn main() {
     implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
     implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
     implications.add(b.at(vec!["b"]).mvdetermines(vec!["c", "d"]));
+    /*
+     * a b c d e 
+     * ~ ^ ^
+     *   ~   ^
+     *
+     * key is ae
+     */
     //implications.add(b.at(vec!['a']).mvdetermines(vec!['b']));
 
     implications.close();
-
-    /*println!("Permute:");
-    let mut p = BTreeSet::new();
-    p.insert('a');
-    p.insert('b');
-    p.insert('c');
-    p.insert('d');
-
-    println!("output: {:?}", permute(&p));*/
 
     let imp = implications.clone();
 
@@ -140,6 +88,14 @@ fn main() {
         }
     }*/
 
+    let n = Normalizer::new(&implications);
+    let normalizations = n.normalize4NF(vec!["a", "e"]);
+
+    for normalization in normalizations {
+        println!("N: {:?}", normalization);
+    }
+        //println!("Normalizes: 
+
     let stdin = io::stdin();
     println!("Query for LHSs:");
     for line in stdin.lock().lines() {
@@ -151,335 +107,17 @@ fn main() {
         for d in implications.clone().fds.clone().iter().filter(|fd| fd.from == toks) {
             if !d.uninteresting() {
                 //println!("Fd: {:?}", d);
-                println!("Finds {:?} -> {:?}", d.from, d.determines);
+                println!("{:?} -> {:?}", d.from, d.determines);
             }
         }
 
         for d in implications.clone().mvds.clone().iter().filter(|fd| fd.from == toks) {
             if !d.uninteresting() {
                 //println!("Mvd: {:?}", d);
-                println!("Finds {:?} ->> {:?}", d.from, d.mvdetermines);
+                println!("{:?} ->> {:?}", d.from, d.mvdetermines);
             }
         }
         //println!("Line: {}", line.unwrap());
     }
-
-    //let mut n = Normalizer::new(implications);
-    //let normalizations = n.normalize4();
-}
-
-#[derive(Hash, Eq, PartialEq, Debug)]
-struct Base {
-    attributes: Vec<String>,
-}
-
-struct ImplicationBuilder<'a> {
-    attribute: Vec<String>,
-    base: &'a Base,
-}
-
-impl<'a> ImplicationBuilder<'a> {
-    pub fn fdetermines(&self, attrs: Vec<&str>) -> Implication<'a> {
-        let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
-        self.owned_fdetermines(attrs)
-    }
-
-    pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Implication<'a> {
-        let attrs = attrs.into_iter().collect();
-        Implication::Functional(FunctionalDependency {
-            base: self.base,
-            from: self.attribute.clone().into_iter().collect(),
-            determines: attrs,
-        })
-    }
-
-    pub fn mvdetermines(&self, attrs: Vec<&str>) -> Implication<'a> {
-        let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
-        self.owned_mvdetermines(attrs)
-    }
-
-    pub fn owned_mvdetermines(&self, attrs: Vec<String>) -> Implication<'a> {
-        let attrs = attrs.into_iter().collect();
-        Implication::Multivalued(MultivaluedDependency {
-            base: self.base,
-            from: self.attribute.clone().into_iter().collect(),
-            mvdetermines: attrs,
-        })
-    }
-}
-
-impl Base {
-    pub fn new(attrs: Vec<&str>) -> Base {
-        Base { attributes: attrs.into_iter().map(|s: &str| s.to_owned()).collect() }
-    }
-
-    pub fn at(&self, attr: Vec<&str>) -> ImplicationBuilder {
-        let attr = attr.into_iter().map(|s: &str| s.to_owned()).collect();
-        ImplicationBuilder {
-            attribute: attr,
-            base: self
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn owned_at(&self, attr: Vec<String>) -> ImplicationBuilder {
-        ImplicationBuilder {
-            attribute: attr,
-            base: self 
-        }
-    }
-}
-
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-struct FunctionalDependency<'a> {
-    base: &'a Base,
-    from: BTreeSet<String>,
-    determines: BTreeSet<String>,
-}
-
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-struct MultivaluedDependency<'a> {
-    base: &'a Base,
-    from: BTreeSet<String>,
-    mvdetermines: BTreeSet<String>,
-}
-
-impl<'a> MultivaluedDependency<'a> {
-    pub fn uninteresting(&self) -> bool {
-        self.trivial() || self.mvdetermines.len() == 0 || !self.from.is_disjoint(&self.mvdetermines)
-    }
-    pub fn trivial(&self) -> bool {
-        self.mvdetermines.is_subset(&self.from) || self.from.union(&self.mvdetermines).count() == self.base.attributes.len()
-    }
-
-    pub fn complementation_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
-        let all_elems: HashSet<String> = self.base.attributes.clone().into_iter().collect();
-        let complement = all_elems
-            .difference( &self.mvdetermines.clone().into_iter().collect() )
-            .cloned()
-            .collect::<HashSet<String>>()
-            .difference( &self.from.clone().into_iter().collect() )
-            .cloned()
-            .collect::<HashSet<String>>();
-
-        let mut h = HashSet::new();
-        h.insert(MultivaluedDependency {
-            base: self.base.clone(),
-            from: self.from.clone(),
-            mvdetermines: complement.into_iter().collect(),
-        });
-
-        h
-    }
-
-    pub fn multivalued_augmentation_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
-        let mut r = HashSet::new();
-        for gamma in permute(&self.base.attributes.clone().into_iter().collect()) {
-            for delta in permute(&gamma) {
-                let mvd = MultivaluedDependency {
-                    from: self.from.union(&gamma).cloned().collect(),
-                    mvdetermines: self.mvdetermines.union(&delta).cloned().collect(),
-                    base: self.base.clone(),
-                };
-                r.insert(mvd);
-            }
-        }
-
-        r
-    }
-
-    pub fn coalescence_closure(&self, other: &FunctionalDependency<'a>) -> HashSet<FunctionalDependency<'a>> {
-        let mut r = HashSet::new();
-        
-        // if alpha ->> beta
-        // gamma subset beta
-        // delta within R
-        // delta disjoint beta
-        // delta -> gamma
-        //
-        // then
-        // alpha -> gamma
-        let alpha = &self.from;
-        let beta = &self.mvdetermines;
-        let delta = &other.from;
-        let gamma = &other.determines;
-        if gamma.is_subset(beta) {
-            if delta.is_disjoint(beta) {
-                let fd = FunctionalDependency {
-                    from: alpha.clone(),
-                    determines: gamma.clone(),
-                    base: self.base.clone(),
-                };
-                r.insert(fd);
-            }
-        }
-
-        r
-    }
-}
-
-impl<'a> FunctionalDependency<'a> {
-    pub fn uninteresting(&self) -> bool {
-        self.trivial() || self.determines.len() == 0 || !self.from.is_disjoint(&self.determines)
-    }
-
-    pub fn trivial(&self) -> bool {
-        self.determines.is_subset(&self.from)
-    }
-
-    pub fn reflexive_closure(&self) -> HashSet<FunctionalDependency<'a>> {
-        let mut r = HashSet::new();
-        for s in permute(&self.from).into_iter() {
-            let fd = FunctionalDependency {
-                from: self.from.clone(),
-                determines: s,
-                base: self.base.clone(),
-            };
-            r.insert(fd);
-        }
-
-        r
-    }
-
-    pub fn augmentation_closure(&self) -> HashSet<FunctionalDependency<'a>> {
-        let mut r = HashSet::new();
-        for s in permute(&self.base.attributes.clone().into_iter().collect()) {
-            let fd = FunctionalDependency {
-                from: self.from.union(&s).cloned().collect(),
-                determines: self.determines.union(&s).cloned().collect(),
-                base: self.base.clone(),
-            };
-            r.insert(fd);
-        }
-
-        r
-    }
-
-    pub fn transitive_closure(&self, other: &FunctionalDependency<'a>) -> HashSet<FunctionalDependency<'a>> {
-        let mut r = HashSet::new();
-        if self.determines == other.from {
-            let fd = FunctionalDependency {
-                from: self.from.clone(),
-                determines: other.determines.clone(),
-                base: self.base.clone(),
-            };
-            r.insert(fd);
-        }
-
-        r
-    }
-
-    pub fn replication_closure(&self) -> HashSet<MultivaluedDependency<'a>> {
-        let mut r = HashSet::new();
-        let mvd = MultivaluedDependency {
-            from: self.from.clone(),
-            mvdetermines: self.determines.clone(),
-            base: self.base.clone(),
-        };
-        r.insert(mvd);
-
-        r
-    }
-}
-
-enum Implication<'a> {
-    Functional(FunctionalDependency<'a>),
-    Multivalued(MultivaluedDependency<'a>),
-}
-
-
-#[derive(Clone)]
-struct ImplicationCollection<'a> {
-    fds: HashSet<FunctionalDependency<'a>>,
-    mvds: HashSet<MultivaluedDependency<'a>>,
-    base: &'a Base,
-}
-
-impl<'a> ImplicationCollection<'a> {
-    pub fn new(base: &'a Base) -> ImplicationCollection<'a> {
-        ImplicationCollection {
-            base,
-            fds: HashSet::new(),
-            mvds: HashSet::new(),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn within(&self) -> &'a Base {
-        self.base
-    }
-
-    pub fn add(&mut self, implication: Implication<'a>) {
-        match implication {
-            Implication::Multivalued(mvd) => {
-                println!("Given {:?} ->> {:?}", mvd.from, mvd.mvdetermines);
-                self.mvds.insert(mvd);
-            },
-            Implication::Functional(fd) => {
-                println!("Given {:?} -> {:?}", fd.from, fd.determines);
-                self.fds.insert(fd);
-            },
-        }
-    }
-
-    pub fn close(&mut self) {
-        //let mut unchanged = false;
-        //let mut det_set: HashSet<HashMap<char, Determines>> = HashSet::new();
-        let mut last_size = 0;
-        while last_size < (self.mvds.len() + self.fds.len()) {
-            last_size = self.mvds.len() + self.fds.len();
-            //println!("Inside loop, current size is {}", last_size);
-            //unchanged = true;
-            for self_mvd in self.mvds.clone() {
-                for mvd in self_mvd.complementation_closure() {
-                    self.mvds.insert(mvd);
-                }
-                for mvd in self_mvd.multivalued_augmentation_closure() {
-                    self.mvds.insert(mvd);
-                }
-
-                for other_fd in self.fds.clone() {
-                    for fd in self_mvd.coalescence_closure(&other_fd) {
-                        self.fds.insert(fd);
-                    }
-                }
-            }
-
-            for self_fd in self.fds.clone() {
-                for fd in self_fd.reflexive_closure() {
-                    self.fds.insert(fd);
-                }
-                for fd in self_fd.augmentation_closure() {
-                    self.fds.insert(fd);
-                }
-                for mvd in self_fd.replication_closure() {
-                    self.mvds.insert(mvd);
-                }
-                for other_fd in self.fds.clone() {
-                    for fd in self_fd.transitive_closure(&other_fd) {
-                        self.fds.insert(fd);
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[allow(dead_code)]
-struct Normalizer<'a> {
-    ic: ImplicationCollection<'a>,
-}
-
-impl<'a> Normalizer<'a> {
-    #[allow(dead_code)]
-    pub fn new(ic: ImplicationCollection<'a>) -> Normalizer<'a> {
-        Normalizer {
-            ic,
-        }
-    }
-
-    #[allow(dead_code, unused_variables, unused_mut)]
-    pub fn normalize4(&mut self, key: Vec<char>) {
-        let mut decompositions: HashSet<HashSet<Vec<char>>> = HashSet::new();
-    }
+    //let normalizations = n.normalize4NF(to_param_vec(implications.keys().iter().next().unwrap()));
 }
