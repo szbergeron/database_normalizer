@@ -58,51 +58,82 @@ fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
 
 type AttrCollection = BTreeSet<String>;
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct Base {
     pub attributes: AttrCollection,
 }
 
-pub struct ImplicationBuilder<'a> {
+pub struct ImplicationBuilder {
     attribute: Vec<String>,
-    base: &'a Base,
+    base: Base,
 }
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub struct FunctionalDependency<'a> {
-    base: &'a Base,
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub struct FunctionalDependency {
+    base: Base,
     pub from: AttrCollection,
     pub determines: AttrCollection,
 }
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub struct MultivaluedDependency<'a> {
-    base: &'a Base,
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub struct MultivaluedDependency {
+    base: Base,
     pub from: AttrCollection,
     pub mvdetermines: AttrCollection,
 }
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub enum Implication<'a> {
-    Functional(FunctionalDependency<'a>),
-    Multivalued(MultivaluedDependency<'a>),
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub enum Implication {
+    Functional(FunctionalDependency),
+    Multivalued(MultivaluedDependency),
+}
+
+impl<'a> fmt::Display for Implication {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _ = match self {
+            Implication::Functional(fd) => write!(f, "{}", fd),
+            Implication::Multivalued(mvd) => write!(f, "{}", mvd),
+        };
+
+        Ok(())
+    }
+}
+
+fn join_attr_list(attribute_list: &AttrCollection) -> String {
+    attribute_list.iter().fold(String::new(), |push, token| push + token)
+}
+
+impl<'a> fmt::Display for MultivaluedDependency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ->> {}", join_attr_list(&self.from), join_attr_list(&self.mvdetermines))
+    }
+}
+
+//use itertools::free::join;
+impl<'a> fmt::Display for FunctionalDependency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        //let join = |attribute_list: AttrCollection| -> String { attribute_list.iter().fold(String::new(), |push, token| push + token) };
+        //let first = self.from.iter().fold(String::new(), |push, token| push + token);
+        //let second = self.determines.iter().fold(String::new(), |push, token| 
+        write!(f, "{} -> {}", join_attr_list(&self.from), join_attr_list(&self.determines))
+    }
 }
 
 
 #[derive(Clone, Debug)]
 pub struct ImplicationCollection<'a> {
-    pub fds: HashSet<FunctionalDependency<'a>>,
-    pub mvds: HashSet<MultivaluedDependency<'a>>,
+    pub fds: HashSet<FunctionalDependency>,
+    pub mvds: HashSet<MultivaluedDependency>,
     base: &'a Base,
 }
 
-impl<'a> ImplicationBuilder<'a> {
-    pub fn fdetermines(&self, attrs: Vec<&str>) -> Implication<'a> {
+impl<'a> ImplicationBuilder {
+    pub fn fdetermines(&self, attrs: Vec<&str>) -> Implication {
         let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
         self.owned_fdetermines(attrs)
     }
 
-    pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Implication<'a> {
+    pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Implication {
         let attrs = attrs.into_iter().collect();
         Implication::Functional(FunctionalDependency {
             base: self.base,
@@ -176,7 +207,7 @@ impl<'a> MultivaluedDependency<'a> {
 
         let mut h = HashSet::new();
         h.insert(MultivaluedDependency {
-            base: self.base.clone(),
+            base: self.base,
             from: self.from.clone(),
             mvdetermines: complement.into_iter().collect(),
         });
@@ -191,7 +222,7 @@ impl<'a> MultivaluedDependency<'a> {
                 let mvd = MultivaluedDependency {
                     from: self.from.union(&gamma).cloned().collect(),
                     mvdetermines: self.mvdetermines.union(&delta).cloned().collect(),
-                    base: self.base.clone(),
+                    base: self.base,
                 };
                 r.insert(mvd);
             }
@@ -220,7 +251,7 @@ impl<'a> MultivaluedDependency<'a> {
                 let fd = FunctionalDependency {
                     from: alpha.clone(),
                     determines: gamma.clone(),
-                    base: self.base.clone(),
+                    base: self.base,
                 };
                 r.insert(fd);
             }
@@ -259,7 +290,7 @@ impl<'a> FunctionalDependency<'a> {
             let fd = FunctionalDependency {
                 from: self.from.clone(),
                 determines: s,
-                base: self.base.clone(),
+                base: self.base,
             };
             r.insert(fd);
         }
@@ -273,7 +304,7 @@ impl<'a> FunctionalDependency<'a> {
             let fd = FunctionalDependency {
                 from: self.from.union(&s).cloned().collect(),
                 determines: self.determines.union(&s).cloned().collect(),
-                base: self.base.clone(),
+                base: self.base,
             };
             r.insert(fd);
         }
@@ -287,7 +318,7 @@ impl<'a> FunctionalDependency<'a> {
             let fd = FunctionalDependency {
                 from: self.from.clone(),
                 determines: other.determines.clone(),
-                base: self.base.clone(),
+                base: self.base,
             };
             r.insert(fd);
         }
@@ -300,7 +331,7 @@ impl<'a> FunctionalDependency<'a> {
         let mvd = MultivaluedDependency {
             from: self.from.clone(),
             mvdetermines: self.determines.clone(),
-            base: self.base.clone(),
+            base: self.base,
         };
         r.insert(mvd);
 
@@ -389,6 +420,34 @@ pub struct Normalizer<'a> {
     ic: &'a ImplicationCollection<'a>,
 }
 
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub enum Decomposition<'a> {
+    Split(Split<'a>),
+    Leaf(AttrCollection),
+}
+
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub struct Split<'a> {
+    pub left: Box<Decomposition<'a>>,
+    pub right: Box<Decomposition<'a>>,
+    by: Implication<'a>,
+}
+
+use std::fmt;
+impl<'a, 'b> std::fmt::Display for Decomposition<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Decomposition::Split(split) => {
+                write!(f, "split {}, {} by applying {}", split.left, split.right, split.by);
+            },
+            Decomposition::Leaf(attributes) => {
+            },
+        }
+
+        Ok(())
+    }
+}
+
 impl<'a> Normalizer<'a> {
     #[allow(dead_code)]
     pub fn new(ic: &'a ImplicationCollection<'a>) -> Normalizer<'a> {
@@ -398,7 +457,7 @@ impl<'a> Normalizer<'a> {
     }
 
     #[allow(dead_code, unused_variables, unused_mut)]
-    pub fn normalize4NF(&self, key: Vec<&str>) -> BTreeSet<BTreeSet<AttrCollection>> {
+    pub fn normalize4NF(&self, key: Vec<&str>) -> BTreeSet<Decomposition> {
         let key: AttrCollection = key.into_iter().map(|s| s.to_owned()).collect();
 
         let mut decompositions: HashSet<HashSet<Vec<char>>> = HashSet::new();
@@ -444,9 +503,10 @@ impl<'a> Normalizer<'a> {
         let mut r = BTreeSet::new();
         if dependencies.len() == 0 {
             //r.insert(from_param_vec(self.ic.base.attributes));
-            let mut r_inner = BTreeSet::new();
-            r_inner.insert(self.ic.base.attributes.clone());
-            r.insert(r_inner);
+            //let mut r_inner = BTreeSet::new();
+            //r_inner.insert(self.ic.base.attributes.clone());
+            r.insert(Decomposition::Leaf(self.ic.base.attributes.clone()));
+            //r.insert(r_inner);
         }
 
         for dependency in dependencies.iter() {
@@ -517,14 +577,20 @@ impl<'a> Normalizer<'a> {
             //let mut r_inner = BTreeSet::new();
             for decomp_a in decomps_a.iter() {
                 for decomp_b in decomps_b.iter() {
-                    let mut pairings: BTreeSet<AttrCollection> = BTreeSet::new();
+                    //let mut pairings = BTreeSet
+                    r.insert(Decomposition::Split(
+                            Split{
+                                left: Box::new(decomp_a.clone()),
+                                right: Box::new(decomp_b.clone()),
+                                by: dependency.clone()}));
+                    /*let mut pairings: BTreeSet<AttrCollection> = BTreeSet::new();
                     for relation_a in decomp_a.clone() {
                         pairings.insert(relation_a);
                     }
                     for relation_b in decomp_b.clone() {
                         pairings.insert(relation_b);
                     }
-                    r.insert(pairings);
+                    r.insert(pairings);*/
                 }
             }
             //r_inner.insert(decomps_a);

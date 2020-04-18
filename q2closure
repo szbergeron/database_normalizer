@@ -1,0 +1,121 @@
+Given {'a'} -> {'b', 'c'}
+Given {'b'} -> {'d'}
+Given {'b'} ->> {'c', 'd'}
+Finds {'a', 'c'} -> {'b', 'd'}
+Finds {'a'} -> {'b', 'c'}
+Finds {'a', 'b'} -> {'c'}
+Finds {'b', 'd'} -> {'c'}
+Finds {'b', 'e'} -> {'d'}
+Finds {'b', 'd', 'e'} -> {'c'}
+Finds {'a', 'b', 'c', 'e'} -> {'d'}
+Finds {'a', 'c'} -> {'d'}
+Finds {'a'} -> {'c', 'd'}
+Finds {'a', 'b', 'e'} -> {'c'}
+Finds {'a', 'e'} -> {'d'}
+Finds {'a'} -> {'c'}
+Finds {'a', 'c', 'd', 'e'} -> {'b'}
+Finds {'a', 'c', 'd'} -> {'b'}
+Finds {'a', 'd', 'e'} -> {'c'}
+Finds {'b', 'e'} -> {'c', 'd'}
+Finds {'a', 'c'} -> {'b'}
+Finds {'b', 'c'} -> {'d'}
+Finds {'b'} -> {'c', 'd'}
+Finds {'a', 'b', 'd'} -> {'c'}
+Finds {'b', 'e'} -> {'c'}
+Finds {'a', 'c', 'e'} -> {'b'}
+Finds {'a', 'd', 'e'} -> {'b', 'c'}
+Finds {'a', 'd'} -> {'c'}
+Finds {'a', 'd', 'e'} -> {'b'}
+Finds {'a', 'c', 'e'} -> {'b', 'd'}
+Finds {'a', 'd'} -> {'b', 'c'}
+Finds {'a', 'b', 'c'} -> {'d'}
+Finds {'a'} -> {'b', 'c', 'd'}
+Finds {'a', 'b'} -> {'c', 'd'}
+Finds {'a', 'e'} -> {'c', 'd'}
+Finds {'b'} -> {'d'}
+Finds {'b'} -> {'c'}
+Finds {'a', 'b', 'e'} -> {'c', 'd'}
+Finds {'a'} -> {'d'}
+Finds {'a', 'b', 'e'} -> {'d'}
+Finds {'a', 'b'} -> {'d'}
+Finds {'a', 'b', 'd', 'e'} -> {'c'}
+Finds {'a'} -> {'b', 'd'}
+Finds {'a', 'e'} -> {'b', 'd'}
+Finds {'a', 'e'} -> {'b'}
+Finds {'a', 'e'} -> {'c'}
+Finds {'a', 'e'} -> {'b', 'c', 'd'}
+Finds {'b', 'c', 'e'} -> {'d'}
+Finds {'a', 'c', 'e'} -> {'d'}
+Finds {'a', 'e'} -> {'b', 'c'}
+Finds {'a'} -> {'b'}
+Finds {'a', 'd'} -> {'b'}
+Finds {'b'} ->> {'c', 'd'}
+Finds {'b', 'c'} ->> {'d'}
+Finds {'a', 'd'} ->> {'c'}
+Finds {'a'} ->> {'c'}
+Finds {'a'} ->> {'b', 'c'}
+Finds {'b', 'c', 'e'} ->> {'a'}
+Finds {'a', 'b'} ->> {'c'}
+Finds {'a', 'b'} ->> {'d'}
+Finds {'a'} ->> {'b', 'd'}
+Finds {'a', 'd'} ->> {'b', 'c'}
+Finds {'a', 'e'} ->> {'b', 'd'}
+Finds {'a', 'b'} ->> {'e'}
+Finds {'a', 'd'} ->> {'c', 'e'}
+Finds {'a'} ->> {'b', 'e'}
+Finds {'b', 'd', 'e'} ->> {'a'}
+Finds {'a', 'b', 'e'} ->> {'d'}
+Finds {'a', 'd'} ->> {'b', 'e'}
+Finds {'a', 'c'} ->> {'b'}
+Finds {'b', 'e'} ->> {'c', 'd'}
+Finds {'a', 'c', 'e'} ->> {'b'}
+Finds {'a', 'e'} ->> {'b', 'c'}
+Finds {'a', 'c'} ->> {'d', 'e'}
+Finds {'a', 'c', 'd'} ->> {'e'}
+Finds {'a'} ->> {'c', 'd', 'e'}
+Finds {'b'} ->> {'a', 'd', 'e'}
+Finds {'a'} ->> {'c', 'e'}
+Finds {'a', 'c'} ->> {'e'}
+Finds {'b'} ->> {'c'}
+Finds {'b', 'e'} ->> {'a'}
+Finds {'b'} ->> {'d'}
+Finds {'a', 'b'} ->> {'c', 'd'}
+Finds {'a', 'b', 'c'} ->> {'d'}
+Finds {'b', 'd'} ->> {'c'}
+Finds {'a'} ->> {'b', 'c', 'd'}
+Finds {'a', 'e'} ->> {'c'}
+Finds {'a', 'd', 'e'} ->> {'b'}
+Finds {'b', 'd', 'e'} ->> {'c'}
+Finds {'a', 'd'} ->> {'b'}
+Finds {'a'} ->> {'d', 'e'}
+Finds {'a', 'd'} ->> {'e'}
+Finds {'a', 'c'} ->> {'b', 'd'}
+Finds {'b', 'e'} ->> {'a', 'd'}
+Finds {'a', 'e'} ->> {'d'}
+Finds {'a', 'd', 'e'} ->> {'c'}
+Finds {'a', 'e'} ->> {'c', 'd'}
+Finds {'a', 'c'} ->> {'b', 'e'}
+Finds {'b', 'c', 'e'} ->> {'d'}
+Finds {'a', 'c', 'd'} ->> {'b'}
+Finds {'b', 'e'} ->> {'c'}
+Finds {'a'} ->> {'b'}
+Finds {'a', 'b', 'd'} ->> {'e'}
+Finds {'a', 'b'} ->> {'d', 'e'}
+Finds {'a'} ->> {'b', 'd', 'e'}
+Finds {'b', 'e'} ->> {'a', 'c'}
+Finds {'a'} ->> {'d'}
+Finds {'a', 'c'} ->> {'d'}
+Finds {'a'} ->> {'c', 'd'}
+Finds {'b', 'e'} ->> {'d'}
+Finds {'a', 'c', 'e'} ->> {'d'}
+Finds {'b', 'c'} ->> {'a', 'e'}
+Finds {'a'} ->> {'e'}
+Finds {'a', 'b', 'd'} ->> {'c'}
+Finds {'a', 'b', 'c'} ->> {'e'}
+Finds {'a', 'b'} ->> {'c', 'e'}
+Finds {'b'} ->> {'a', 'c', 'e'}
+Finds {'a', 'b', 'e'} ->> {'c'}
+Finds {'a'} ->> {'b', 'c', 'e'}
+Finds {'b', 'd'} ->> {'a', 'e'}
+Finds {'a', 'e'} ->> {'b'}
+Finds {'b'} ->> {'a', 'e'}
