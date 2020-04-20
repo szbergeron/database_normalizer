@@ -1,4 +1,4 @@
-#Current Features:
+##Current Features:
 * Computes closure of any { table, mvds, fds } to create { table, mvds+, fds+ }
 * Produces all minimal decompositions of a given relation into 4nf relations.
 
