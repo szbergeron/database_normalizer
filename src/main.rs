@@ -2,22 +2,24 @@
 
 use std::io;
 use std::io::prelude::*;
-use std::collections::HashSet;
-use std::collections::HashMap;
-use std::rc::Rc;
+//use std::collections::HashSet;
+//use std::collections::HashMap;
+//use std::rc::Rc;
 use std::collections::BTreeSet;
 //use crate::ImplicationCollection;
 use rust_closure_generator::*;
 
 fn main() {
-    let b = Base::new(vec!["a", "b", "c", "d", "e"]);
+    let b = Base::new(vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
     //let b = Base::new(vec!['a', 'b']);
 
     let mut implications = ImplicationCollection::new(&b);
 
     implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
     implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
-    implications.add(b.at(vec!["b"]).mvdetermines(vec!["c", "d"]));
+    implications.add(b.at(vec!["b"]).mvdetermines(vec!["b", "g", "h"]));
+    implications.add(b.at(vec!["d", "c"]).fdetermines(vec!["a"]));
+    implications.add(b.at(vec!["f", "g", "i"]).fdetermines(vec!["e"]));
     /*
      * a b c d e 
      * ~ ^ ^
@@ -91,7 +93,7 @@ fn main() {
     }*/
 
     let n = Normalizer::new(&implications);
-    let normalizations = n.normalize4NF(vec!["a", "e"]);
+    let normalizations = n.normalize_4nf(vec!["a", "e"]);
     println!("Finished normalizing, culling uninteresting normalizations...");
 
     //let mut filtered: HashMap<BTreeSet<Rc<AttrCollection>>, Decomposition> = HashMap::new();
@@ -100,8 +102,24 @@ fn main() {
         //println!("N: {}", normalization);
     }*/
 
-    for (flat, normalization) in normalizations {
-        println!("N: {:?} ||| {}", flat, normalization);
+    for (flat, _) in normalizations.iter().filter(|(flat, _)| {
+        //let mut minimal = true;
+        for a in flat.iter() {
+            for b in flat.iter() {
+                //println!("A: {:?}, B: {:?}", a, b);
+                if a.is_subset(b) && a != b { 
+                    //println!("sdafhgalkgaiosguiowefwuiojhfiujifoasdj");
+                    //println!("Cull non-minimal decomposition {:?}", flat);
+                    return false;
+                    //minimal = true;
+                }
+            }
+        }
+
+        true
+    }){
+        //println!("N: {:?} ||| {}", flat, normalization);
+        println!("Normalization: {:?}", flat);
     }
         //println!("Normalizes: 
 
