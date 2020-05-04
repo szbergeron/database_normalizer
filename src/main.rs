@@ -10,16 +10,17 @@ use std::collections::BTreeSet;
 use rust_closure_generator::*;
 
 fn main() {
-    let b = Base::new(vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
+    //let b = Base::new(vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
+    let b = Base::new(vec!["a", "b", "c", "d", "e"]);
     //let b = Base::new(vec!['a', 'b']);
 
     let mut implications = ImplicationCollection::new(&b);
 
     implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
     implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
-    implications.add(b.at(vec!["b"]).mvdetermines(vec!["b", "g", "h"]));
+    //implications.add(b.at(vec!["b"]).mvdetermines(vec!["b", "g", "h"]));
     implications.add(b.at(vec!["d", "c"]).fdetermines(vec!["a"]));
-    implications.add(b.at(vec!["f", "g", "i"]).fdetermines(vec!["e"]));
+    //implications.add(b.at(vec!["f", "g", "i"]).fdetermines(vec!["e"]));
     /*
      * a b c d e 
      * ~ ^ ^
@@ -30,6 +31,8 @@ fn main() {
     //implications.add(b.at(vec!['a']).mvdetermines(vec!['b']));
 
     implications.close();
+
+    println!("Keys: {:?}", implications.keys());
 
     let imp = implications.clone();
 
@@ -119,7 +122,7 @@ fn main() {
         true
     }){
         //println!("N: {:?} ||| {}", flat, normalization);
-        println!("Normalization: {:?}", flat);
+        //println!("Normalization: {:?}", flat);
     }
         //println!("Normalizes: 
 

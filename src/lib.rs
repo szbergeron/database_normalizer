@@ -79,6 +79,12 @@ pub struct ImplicationBuilder {
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub struct Key {
+    attributes: Rc<AttrCollection>,
+    derivation: Rc<BTreeSet<FunctionalDependency>>,
+}
+
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct FunctionalDependency {
     base: Rc<Base>,
     pub from: Rc<AttrCollection>,
@@ -412,9 +418,65 @@ impl<'a> ImplicationCollection<'a> {
     }
 
     // requires already close()ed to return correct results
-    pub fn keys(&self) -> BTreeSet<BTreeSet<String>> {
+    pub fn keys(&self) -> BTreeSet<Key> {
         // find all
-        panic!("not implemented");
+        //panic!("not implemented");
+        //println!("In keys");
+        let v: Vec<Key> = permute(&(*self.base.attributes))
+            .into_iter()
+            .filter_map(|schema| {
+                //println!("was given schema {:?}", schema);
+                let mut reachable: BTreeSet<String> = schema.clone();
+                let mut changing = true;
+
+                let mut derivation: BTreeSet<FunctionalDependency> = BTreeSet::new();
+                while changing {
+                    changing = false;
+                    for fd in self.fds.iter() {
+                        if fd.from.is_subset(&reachable) {
+                            //reachable.append(&mut (*fd.determines).clone());
+                            let size_before = reachable.len();
+                            //changing = true;
+                            fd.determines.iter().for_each(|elem| {
+                                reachable.insert(elem.clone());
+                            });
+
+                            let size_after = reachable.len();
+
+                            changing = size_after != size_before;
+                            if changing {
+                                derivation.insert(fd.clone());
+                            }
+                        }
+                    }
+                }
+                //println!("{:?} is reachable from key candidate {:?}", reachable, schema);
+
+                //&reachable == schema
+                //reachable.is_superset(schema)
+                //
+                if reachable.is_superset(&(*self.base.attributes)) {
+                    Some(Key { derivation: Rc::new(derivation), attributes: Rc::new(schema) })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        /*for superkey in v {
+
+        }*/
+        //println!("Candidate keys: {:?}", v);
+        v
+            .clone()
+            .into_iter()
+            .filter(|superkey| { // only allow through if not superset of any other key
+                v.iter().filter(|otherkey| superkey.attributes.is_superset(&otherkey.attributes) && superkey.attributes != otherkey.attributes).count() == 0
+            })
+            .collect()
+        /*for perm in permute(&(*self.base.attributes)) {
+        }*/
+        //panic!();
     }
 
     pub fn add(&mut self, implication: Implication) {
