@@ -1,6 +1,7 @@
 ##Current Features:
 * Computes closure of any { table, mvds, fds } to create { table, mvds+, fds+ }
 * Produces all minimal decompositions of a given relation into 4nf relations.
+* Computes all candidate keys of any given schema and fds
 
 Currently quite rough, performance is around n^3n! relative to the number of columns in a database if the given fds and mvds scale with it.
 
