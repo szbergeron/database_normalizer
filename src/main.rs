@@ -32,7 +32,11 @@ fn main() {
 
     implications.close();
 
-    println!("Keys: {:?}", implications.keys());
+    print_keys(&implications);
+    print_4nf(&implications);
+    dependency_query_loop(&implications);
+
+    /*println!("Keys: {:?}", implications.keys());
 
     let imp = implications.clone();
 
@@ -150,4 +154,70 @@ fn main() {
         //println!("Line: {}", line.unwrap());
     }
     //let normalizations = n.normalize4NF(to_param_vec(implications.keys().iter().next().unwrap()));
+    //
+    */
+}
+
+fn print_keys(dc: &DependencyCollection) -> () {
+    for key in dc.keys() {
+        println!("Key: {:?}", key);
+    }
+    //println!("Keys: {:?}", dc.keys());
+}
+
+fn print_4nf(dc: &DependencyCollection) -> () {
+    for key in dc.keys() {
+        println!("4nf normalizations from key: {:?}", key);
+        let n = Normalizer::new(&dc);
+        let keyvec: Vec<&str> = key.attributes.iter().map(|owned_str| &owned_str[..]).collect();
+        let normalizations = n.normalize_4nf(keyvec);
+
+        for (flat, normalization) in normalizations.iter().filter(|(flat, _)| {
+            //let mut minimal = true;
+            for a in flat.iter() {
+                for b in flat.iter() {
+                    //println!("A: {:?}, B: {:?}", a, b);
+                    if a.is_subset(b) && a != b { 
+                        //println!("sdafhgalkgaiosguiowefwuiojhfiujifoasdj");
+                        //println!("Cull non-minimal decomposition {:?}", flat);
+                        return false;
+                        //minimal = true;
+                    }
+                }
+            }
+
+            true
+        }){
+            println!("N: {:?} ||| {}", flat, normalization);
+            //println!("Normalization: {:?}", flat);
+        }
+    }
+
+}
+
+fn dependency_query_loop(implications: &DependencyCollection) -> () {
+    //panic!();
+    let stdin = io::stdin();
+    println!("Query for LHSs:");
+    for line in stdin.lock().lines() {
+        let line: String = line.unwrap();
+        let toks: BTreeSet<String> = line.split_whitespace().map(|s: &str| { s.to_owned() }).collect();
+
+        //let imp = implications.clone();
+
+        for d in implications.clone().fds.clone().iter().filter(|fd| *fd.from == toks) {
+            if !d.uninteresting() {
+                //println!("Fd: {:?}", d);
+                println!("{:?} -> {:?}", d.from, d.determines);
+            }
+        }
+
+        for d in implications.clone().mvds.clone().iter().filter(|fd| *fd.from == toks) {
+            if !d.uninteresting() {
+                //println!("Mvd: {:?}", d);
+                println!("{:?} ->> {:?}", d.from, d.mvdetermines);
+            }
+        }
+        //println!("Line: {}", line.unwrap());
+    }
 }

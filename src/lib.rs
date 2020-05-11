@@ -80,8 +80,8 @@ pub struct DependencyBuilder {
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct Key {
-    attributes: Rc<AttrCollection>,
-    derivation: Rc<BTreeSet<FunctionalDependency>>,
+    pub attributes: Rc<AttrCollection>,
+    pub derivation: Rc<BTreeSet<FunctionalDependency>>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
