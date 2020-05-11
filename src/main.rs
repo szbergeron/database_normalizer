@@ -11,15 +11,30 @@ use rust_closure_generator::*;
 
 fn main() {
     //let b = Base::new(vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
-    let b = Base::new(vec!["a", "b", "c", "d", "e"]);
+    let b = Base::new(vec!["a", "b", "c", "d"]);
     //let b = Base::new(vec!['a', 'b']);
 
     let mut implications = DependencyCollection::new(&b);
+    implications.add(b.at(vec!["c"]).fdetermines(vec!["d"]));
+    implications.add(b.at(vec!["c", "d"]).fdetermines(vec!["a"]));
+    implications.add(b.at(vec!["a", "b"]).fdetermines(vec!["c"]));
+    implications.add(b.at(vec!["b", "d"]).fdetermines(vec!["a"]));
 
-    implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
-    implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
+
+
+
+    //implications.add(b.at(vec!["a", "c"]).fdetermines(vec!["d"]));
+    //implications.add(b.at(vec!["b", "c", "E"]).fdetermines(vec!["a"]));
+    //implications.add(b.at(vec!["c", "d"]).fdetermines(vec!["a"]));
+    //implications.add(b.at(vec!["c", "E"]).fdetermines(vec!["b"]));
+    //implications.add(b.at(vec!["b"]).fdetermines(vec!["c"]));
+    //implications.add(b.at(vec!["a"]).mvdetermines(vec!["c"]));
+    //implications.add(b.at(vec!["b"]).mvdetermines(vec!["d"]));
+
+    //implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
+    //implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
     //implications.add(b.at(vec!["b"]).mvdetermines(vec!["b", "g", "h"]));
-    implications.add(b.at(vec!["d", "c"]).fdetermines(vec!["a"]));
+    //implications.add(b.at(vec!["d", "c"]).fdetermines(vec!["a"]));
     //implications.add(b.at(vec!["f", "g", "i"]).fdetermines(vec!["e"]));
     /*
      * a b c d e 
@@ -33,8 +48,11 @@ fn main() {
     implications.close();
 
     print_keys(&implications);
+
+    println!();
+    //print_fds_mvds(&implications);
     print_4nf(&implications);
-    dependency_query_loop(&implications);
+    //dependency_query_loop(&implications);
 
     /*println!("Keys: {:?}", implications.keys());
 
@@ -166,8 +184,10 @@ fn print_keys(dc: &DependencyCollection) -> () {
 }
 
 fn print_4nf(dc: &DependencyCollection) -> () {
+    println!();
     for key in dc.keys() {
         println!("4nf normalizations from key: {:?}", key);
+        println!();
         let n = Normalizer::new(&dc);
         let keyvec: Vec<&str> = key.attributes.iter().map(|owned_str| &owned_str[..]).collect();
         let normalizations = n.normalize_4nf(keyvec);
@@ -219,5 +239,21 @@ fn dependency_query_loop(implications: &DependencyCollection) -> () {
             }
         }
         //println!("Line: {}", line.unwrap());
+    }
+}
+
+fn print_fds_mvds(imp: &DependencyCollection) -> () {
+    for d in imp.fds.iter() {
+        if !d.uninteresting() {
+            //println!("Fd: {:?}", d);
+            println!("Finds {:?} -> {:?}", d.from, d.determines);
+        }
+    }
+
+    for d in imp.mvds.iter() {
+        if !d.uninteresting().clone() {
+            //println!("Mvd: {:?}", d);
+            println!("Finds {:?} ->> {:?}", d.from, d.mvdetermines);
+        }
     }
 }
