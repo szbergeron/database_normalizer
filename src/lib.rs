@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 //use std::collections::
 
-static_assertions::assert_impl_all!(Implication: std::marker::Sized);
+static_assertions::assert_impl_all!(Dependency: std::marker::Sized);
 
 fn permute<T>(set: &BTreeSet<T>) -> HashSet<BTreeSet<T>>
 where
@@ -73,7 +73,7 @@ pub struct Base {
     pub attributes: Rc<AttrCollection>,
 }
 
-pub struct ImplicationBuilder {
+pub struct DependencyBuilder {
     attribute: Vec<String>,
     base: Rc<Base>,
 }
@@ -99,25 +99,25 @@ pub struct MultivaluedDependency {
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
-pub enum Implication {
+pub enum Dependency {
     Functional(FunctionalDependency),
     Multivalued(MultivaluedDependency),
 }
 
-impl Implication {
+impl Dependency {
     pub fn base(&self) -> Rc<Base> {
         match self {
-            Implication::Functional(fd) => fd.base.clone(),
-            Implication::Multivalued(mvd) => mvd.base.clone(),
+            Dependency::Functional(fd) => fd.base.clone(),
+            Dependency::Multivalued(mvd) => mvd.base.clone(),
         }
     }
 }
 
-impl<'a> fmt::Display for Implication {
+impl<'a> fmt::Display for Dependency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _ = match self {
-            Implication::Functional(fd) => write!(f, "{}", fd),
-            Implication::Multivalued(mvd) => write!(f, "{}", mvd),
+            Dependency::Functional(fd) => write!(f, "{}", fd),
+            Dependency::Multivalued(mvd) => write!(f, "{}", mvd),
         };
 
         Ok(())
@@ -165,35 +165,35 @@ impl fmt::Display for Base {
 }
 
 #[derive(Clone, Debug)]
-pub struct ImplicationCollection<'a> {
+pub struct DependencyCollection<'a> {
     pub fds: HashSet<FunctionalDependency>,
     pub mvds: HashSet<MultivaluedDependency>,
     base: &'a Base,
 }
 
-impl<'a> ImplicationBuilder {
-    pub fn fdetermines(&self, attrs: Vec<&str>) -> Implication {
+impl<'a> DependencyBuilder {
+    pub fn fdetermines(&self, attrs: Vec<&str>) -> Dependency {
         let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
         self.owned_fdetermines(attrs)
     }
 
-    pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Implication {
+    pub fn owned_fdetermines(&self, attrs: Vec<String>) -> Dependency {
         let attrs = Rc::new(attrs.into_iter().collect());
-        Implication::Functional(FunctionalDependency {
+        Dependency::Functional(FunctionalDependency {
             base: self.base.clone(),
             from: Rc::new(self.attribute.clone().into_iter().collect()),
             determines: attrs,
         })
     }
 
-    pub fn mvdetermines(&self, attrs: Vec<&str>) -> Implication {
+    pub fn mvdetermines(&self, attrs: Vec<&str>) -> Dependency {
         let attrs = attrs.into_iter().map(|s: &str| s.to_owned()).collect();
         self.owned_mvdetermines(attrs)
     }
 
-    pub fn owned_mvdetermines(&self, attrs: Vec<String>) -> Implication {
+    pub fn owned_mvdetermines(&self, attrs: Vec<String>) -> Dependency {
         let attrs = Rc::new(attrs.into_iter().collect());
-        Implication::Multivalued(MultivaluedDependency {
+        Dependency::Multivalued(MultivaluedDependency {
             base: self.base.clone(),
             from: Rc::new(self.attribute.clone().into_iter().collect()),
             mvdetermines: attrs,
@@ -208,17 +208,17 @@ impl Base {
         }
     }
 
-    pub fn at(&self, attr: Vec<&str>) -> ImplicationBuilder {
+    pub fn at(&self, attr: Vec<&str>) -> DependencyBuilder {
         let attr = attr.into_iter().map(|s: &str| s.to_owned()).collect();
-        ImplicationBuilder {
+        DependencyBuilder {
             attribute: attr,
             base: Rc::new(self.clone()),
         }
     }
 
     #[allow(dead_code)]
-    pub fn owned_at(&self, attr: Vec<String>) -> ImplicationBuilder {
-        ImplicationBuilder {
+    pub fn owned_at(&self, attr: Vec<String>) -> DependencyBuilder {
+        DependencyBuilder {
             attribute: attr,
             base: Rc::new(self.clone()),
         }
@@ -322,11 +322,11 @@ impl<'a> MultivaluedDependency {
     }
 }
 
-trait Dependency {
+/*trait Dependency {
     fn decompositionally_useful(&self) -> bool;
     fn trivial(&self) -> bool;
     fn uninteresting(&self) -> bool;
-}
+}*/
 
 impl<'a> FunctionalDependency {
     pub fn attr_count(&self) -> usize {
@@ -357,6 +357,14 @@ impl<'a> FunctionalDependency {
         }
 
         r
+    }
+
+    pub fn partially_functionally_dependent(&self, key: &AttrCollection) -> bool {
+        self.from.is_subset(key) && key.len() > self.from.len()
+    }
+
+    pub fn fully_functionally_dependent(&self, key: &AttrCollection) -> bool {
+        *self.from == *key
     }
 
     pub fn augmentation_closure(&self) -> HashSet<FunctionalDependency> {
@@ -403,9 +411,9 @@ impl<'a> FunctionalDependency {
     }
 }
 
-impl<'a> ImplicationCollection<'a> {
-    pub fn new(base: &'a Base) -> ImplicationCollection<'a> {
-        ImplicationCollection {
+impl<'a> DependencyCollection<'a> {
+    pub fn new(base: &'a Base) -> DependencyCollection<'a> {
+        DependencyCollection {
             base,
             fds: HashSet::new(),
             mvds: HashSet::new(),
@@ -452,40 +460,39 @@ impl<'a> ImplicationCollection<'a> {
                 }
                 //println!("{:?} is reachable from key candidate {:?}", reachable, schema);
 
-                //&reachable == schema
-                //reachable.is_superset(schema)
-                //
                 if reachable.is_superset(&(*self.base.attributes)) {
-                    Some(Key { derivation: Rc::new(derivation), attributes: Rc::new(schema) })
+                    Some(Key {
+                        derivation: Rc::new(derivation),
+                        attributes: Rc::new(schema),
+                    })
                 } else {
                     None
                 }
             })
             .collect();
 
-        /*for superkey in v {
-
-        }*/
-        //println!("Candidate keys: {:?}", v);
-        v
-            .clone()
+        v.clone()
             .into_iter()
-            .filter(|superkey| { // only allow through if not superset of any other key
-                v.iter().filter(|otherkey| superkey.attributes.is_superset(&otherkey.attributes) && superkey.attributes != otherkey.attributes).count() == 0
+            .filter(|superkey| {
+                // only allow through if not superset of any other key
+                v.iter()
+                    .filter(|otherkey| {
+                        superkey.attributes.is_superset(&otherkey.attributes)
+                            && superkey.attributes != otherkey.attributes
+                    })
+                    .count()
+                    == 0
             })
             .collect()
-        /*for perm in permute(&(*self.base.attributes)) {
-        }*/
-        //panic!();
     }
 
-    pub fn add(&mut self, implication: Implication) {
+    pub fn add(&mut self, implication: Dependency) {
         match implication {
-            Implication::Multivalued(mvd) => {
+            Dependency::Multivalued(mvd) => {
                 println!("Given {:?} ->> {:?}", mvd.from, mvd.mvdetermines);
                 self.mvds.insert(mvd);
             }
-            Implication::Functional(fd) => {
+            Dependency::Functional(fd) => {
                 println!("Given {:?} -> {:?}", fd.from, fd.determines);
                 self.fds.insert(fd);
             }
@@ -537,7 +544,7 @@ impl<'a> ImplicationCollection<'a> {
 
 #[allow(dead_code)]
 pub struct Normalizer<'a> {
-    ic: &'a ImplicationCollection<'a>,
+    ic: &'a DependencyCollection<'a>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
@@ -568,7 +575,7 @@ impl Decomposition {
 pub struct Split {
     pub left: Rc<Decomposition>,
     pub right: Rc<Decomposition>,
-    by: Implication,
+    by: Dependency,
 }
 
 use std::fmt;
@@ -589,7 +596,7 @@ impl<'a, 'b> std::fmt::Display for Decomposition {
 
 impl<'a> Normalizer<'a> {
     #[allow(dead_code)]
-    pub fn new(ic: &'a ImplicationCollection<'a>) -> Normalizer<'a> {
+    pub fn new(ic: &'a DependencyCollection<'a>) -> Normalizer<'a> {
         Normalizer { ic }
     }
 
@@ -606,7 +613,9 @@ impl<'a> Normalizer<'a> {
 
         //self.ic.fds
         //self.ic.fds
-        let ic: &ImplicationCollection<'a> = &self.ic;
+        let ic: &DependencyCollection<'a> = &self.ic;
+        let dependencies = self.useful_dependencies_from(&key);
+        /*let ic: &ImplicationCollection<'a> = &self.ic;
         let dependencies: Vec<Implication> = ic
             .fds
             .iter()
@@ -628,7 +637,7 @@ impl<'a> Normalizer<'a> {
                     })
                     .map(|mvd| Implication::Multivalued(mvd.clone())),
             )
-            .collect::<Vec<Implication>>();
+            .collect::<Vec<Implication>>();*/
 
         let mut r = HashMap::new();
         if dependencies.len() == 0 {
@@ -646,13 +655,13 @@ impl<'a> Normalizer<'a> {
             //println!("Decomp tries dependency {:?}", dependency);
             //all the different ways we can split up the table
             let (from, to, base, key_a) = match dependency {
-                Implication::Functional(fd) => (
+                Dependency::Functional(fd) => (
                     fd.from.clone(),
                     fd.determines.clone(),
                     fd.base.clone(),
                     fd.from.clone(),
                 ),
-                Implication::Multivalued(mvd) => (
+                Dependency::Multivalued(mvd) => (
                     mvd.from.clone(),
                     mvd.mvdetermines.clone(),
                     mvd.base.clone(),
@@ -714,7 +723,7 @@ impl<'a> Normalizer<'a> {
                 panic!("Decomposition lost some attrs");
             }*/
 
-            let relation_a = ImplicationCollection {
+            let relation_a = DependencyCollection {
                 fds: fds[0].clone(),
                 mvds: mvds[0].clone(),
                 base: &base_a,
@@ -722,7 +731,7 @@ impl<'a> Normalizer<'a> {
 
             let normalized_a = Normalizer::new(&relation_a);
 
-            let relation_b = ImplicationCollection {
+            let relation_b = DependencyCollection {
                 fds: fds[1].clone(),
                 mvds: mvds[1].clone(),
                 base: &base_b,
@@ -806,11 +815,61 @@ impl<'a> Normalizer<'a> {
         r
     }
 
+    fn useful_dependencies_from(&self, key: &AttrCollection) -> Vec<Dependency> {
+        let ic: &DependencyCollection<'a> = &self.ic;
+        let dependencies: Vec<Dependency> = ic
+            .fds
+            .iter()
+            .filter(|fd| {
+                !fd.trivial()
+                    && fd.decompositionally_useful()
+                    && !key.is_subset(&fd.from)
+                    && !fd.uninteresting()
+            })
+            .map(|fd| Dependency::Functional(fd.clone()))
+            .chain(
+                ic.mvds
+                    .iter()
+                    .filter(|mvd| {
+                        !mvd.trivial()
+                            && mvd.decompositionally_useful()
+                            && !key.is_subset(&mvd.from)
+                            && !mvd.uninteresting()
+                    })
+                    .map(|mvd| Dependency::Multivalued(mvd.clone())),
+            )
+            .collect::<Vec<Dependency>>();
+
+        dependencies
+    }
+
+
     pub fn normalize_bcnf(&mut self, _key: Vec<&str>) {}
 
     pub fn normalize_3nf(&mut self, _key: Vec<&str>) {}
 
-    pub fn normalize_2nf(&mut self, _key: Vec<&str>) {}
+    pub fn normalize_2nf(&mut self, key: Vec<&str>) -> HashMap<BTreeSet<Rc<AttrCollection>>, Decomposition> {
+        let key: AttrCollection = key.into_iter().map(|s| s.to_owned()).collect();
+        //let _ic: &DependencyCollection<'a> = &self.ic;
+        let dependencies = self.useful_dependencies_from(&key);
+        let fds = dependencies
+            .iter()
+            .filter_map(|dep|
+                    match dep {
+                        Dependency::Multivalued(_) => None,
+                        Dependency::Functional(fd) => Some(fd)
+                    }
+            )
+            .filter(|fd| {
+                fd.partially_functionally_dependent(&key)
+            });
+
+        for _fd in fds {
+            //
+        }
+
+        panic!()
+    }
 }
 
 pub fn to_param_vec<'a>(owned_collection: &'a AttrCollection) -> Vec<&'a str> {

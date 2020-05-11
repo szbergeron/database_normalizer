@@ -14,7 +14,7 @@ fn main() {
     let b = Base::new(vec!["a", "b", "c", "d", "e"]);
     //let b = Base::new(vec!['a', 'b']);
 
-    let mut implications = ImplicationCollection::new(&b);
+    let mut implications = DependencyCollection::new(&b);
 
     implications.add(b.at(vec!["a"]).fdetermines(vec!["b", "c"]));
     implications.add(b.at(vec!["b"]).fdetermines(vec!["d"]));
@@ -105,7 +105,7 @@ fn main() {
         //println!("N: {}", normalization);
     }*/
 
-    for (flat, _) in normalizations.iter().filter(|(flat, _)| {
+    for (_flat, _) in normalizations.iter().filter(|(flat, _)| {
         //let mut minimal = true;
         for a in flat.iter() {
             for b in flat.iter() {
